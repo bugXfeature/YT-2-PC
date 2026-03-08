@@ -6,6 +6,7 @@ import uuid
 app = Flask(__name__)
 
 TEMP_DIR = '/tmp'
+COOKIES_FILE = os.path.join(os.path.dirname(__file__), 'cookies.txt')
 
 @app.route('/')
 def index():
@@ -15,7 +16,14 @@ def index():
 def info():
     url = request.form['url']
     try:
-        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+        ydl_opts = {
+            'quiet': True,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+        }
+        if os.path.exists(COOKIES_FILE):
+            ydl_opts['cookiefile'] = COOKIES_FILE
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             return {
                 'title': info.get('title'),
@@ -38,7 +46,10 @@ def download():
             'merge_output_format': 'mp4',
             'quiet': True,
             'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
         }
+        if os.path.exists(COOKIES_FILE):
+            ydl_opts['cookiefile'] = COOKIES_FILE
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
