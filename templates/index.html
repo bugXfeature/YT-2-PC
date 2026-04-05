@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT Downloader</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --red: #ff2222;
+      --red-dim: #991111;
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface2: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #f0f0f0;
+      --muted: #666;
+      --accent: #ff2222;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: 'Syne', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,34,34,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,34,34,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* Glow blob */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(255,34,34,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 44px;
+      width: 100%;
+      max-width: 500px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 0 1px rgba(255,34,34,0.06), 0 32px 64px rgba(0,0,0,0.6);
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--red);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg { width: 16px; height: 16px; fill: white; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 32px;
+      letter-spacing: 0.02em;
+    }
+
+    /* URL row */
+    .url-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 13px;
+      font-family: 'JetBrains Mono', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus { border-color: var(--red); }
+    input[type="text"]::placeholder { color: #444; }
+
+    .fetch-btn {
+      padding: 12px 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .fetch-btn:hover { border-color: var(--red); background: #1f1f1f; }
+
+    /* Options panel - hidden until URL fetched */
+    .options-panel {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      animation: slideIn 0.25s ease;
+    }
+
+    .options-panel.visible { display: flex; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .video-title {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #aaa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-title span { color: var(--red); margin-right: 6px; }
+
+    /* Mode toggle */
+    .mode-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mode-btn {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .mode-btn:hover { border-color: #444; color: var(--text); }
+
+    .mode-btn.active {
+      border-color: var(--red);
+      background: rgba(255,34,34,0.08);
+      color: var(--text);
+    }
+
+    .mode-btn svg { width: 16px; height: 16px; }
+
+    /* Quality selector */
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .quality-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .quality-chip {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .quality-chip:hover { border-color: #444; color: var(--text); }
+
+    .quality-chip.selected {
+      border-color: var(--red);
+      background: rgba(255,34,34,0.1);
+      color: var(--text);
+    }
+
+    /* Save path */
+    .path-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .path-row input {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+
+    .path-hint {
+      font-size: 11px;
+      color: #444;
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 4px;
+    }
+
+    /* Download button */
+    .dl-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--red);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: background 0.2s, transform 0.1s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dl-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+    }
+
+    .dl-btn:hover { background: #e01e1e; }
+    .dl-btn:active { transform: scale(0.99); }
+    .dl-btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+
+    #status {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-align: center;
+      min-height: 18px;
+    }
+
+    #status.error { color: #ff6666; }
+    #status.loading { color: #ffaa44; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Hidden inputs */
+     input[type="hidden"]{}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-row">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M21.543 6.498C22 8.28 22 12 22 12s0 3.72-.457 5.502c-.254.985-.997 1.76-1.938 2.022C17.896 20 12 20 12 20s-5.893 0-7.605-.476c-.945-.266-1.687-1.04-1.938-2.022C2 15.72 2 12 2 12s0-3.72.457-5.502c.254-.985.997-1.76 1.938-2.022C6.107 4 12 4 12 4s5.896 0 7.605.476c.945.266 1.687 1.04 1.938 2.022zM10 15.5l6-3.5-6-3.5v7z"/></svg>
+      </div>
+      <h1>YT Downloader</h1>
+    </div>
+    <p class="subtitle">// highest quality · local download</p>
+
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="https://youtube.com/watch?v=..." />
+      <button class="fetch-btn" onclick="fetchInfo()">Fetch</button>
+    </div>
+
+    <div class="options-panel" id="optionsPanel">
+      <div class="video-title" id="videoTitle"><span>▶</span><span id="titleText"></span></div>
+
+      <div class="divider"></div>
+
+      <div>
+        <div class="field-label">Format</div>
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="modeVideo" onclick="setMode('video')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 8v8H5V8h10m1-2H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4V7c0-.55-.45-1-1-1z"/></svg>
+            Video (MP4)
+          </button>
+          <button class="mode-btn" id="modeAudio" onclick="setMode('audio')">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+            Audio (MP3)
+          </button>
+        </div>
+      </div>
+
+      <div id="qualitySection">
+        <div class="field-label">Quality</div>
+        <div class="quality-grid" id="qualityGrid"></div>
+      </div>
+
+      <div>
+        <div class="field-label">Save Location</div>
+        <input type="text" id="savePath" placeholder="Leave blank to use browser default download folder" style="width:100%;" />
+        <div class="path-hint">e.g. C:\Users\You\Videos or /home/you/videos — leave blank for browser default</div>
+      </div>
+
+      <form id="dlForm" action="/download" method="POST" onsubmit="startDownload()">
+        <input type="hidden" name="url" id="formUrl" />
+        <input type="hidden" name="mode" id="formMode" value="video" />
+        <input type="hidden" name="resolution" id="formResolution" value="highest" />
+        <input type="hidden" name="save_path" id="formSavePath" />
+        <button type="submit" class="dl-btn" id="dlBtn">↓ Download</button>
+      </form>
+    </div>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    let currentMode = 'video';
+    let selectedResolution = 'highest';
+
+    async function fetchInfo() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return;
+
+      setStatus('Fetching video info...', 'loading');
+      try {
+        const res = await fetch('/get_qualities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.error) { setStatus('Error: ' + data.error, 'error'); return; }
+
+        document.getElementById('titleText').textContent = data.title;
+        buildQualityChips(data.resolutions);
+        document.getElementById('optionsPanel').classList.add('visible');
+        setStatus('');
+      } catch(e) {
+        setStatus('Failed to fetch video info', 'error');
+      }
+    }
+
+    function buildQualityChips(resolutions) {
+      const grid = document.getElementById('qualityGrid');
+      grid.innerHTML = '';
+
+      // Add "Highest" option
+      const chip = makeChip('Highest', 'highest');
+      chip.classList.add('selected');
+      grid.appendChild(chip);
+      selectedResolution = 'highest';
+
+      resolutions.forEach(r => {
+        grid.appendChild(makeChip(r, r));
+      });
+    }
+
+    function makeChip(label, value) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'quality-chip';
+      el.textContent = label;
+      el.dataset.value = value;
+      el.onclick = () => selectQuality(el, value);
+      return el;
+    }
+
+    function selectQuality(el, value) {
+      document.querySelectorAll('.quality-chip').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedResolution = value;
+    }
+
+    function setMode(mode) {
+      currentMode = mode;
+      document.getElementById('modeVideo').classList.toggle('active', mode === 'video');
+      document.getElementById('modeAudio').classList.toggle('active', mode === 'audio');
+      document.getElementById('qualitySection').style.display = mode === 'audio' ? 'none' : '';
+    }
+
+    function startDownload() {
+      const url = document.getElementById('urlInput').value.trim();
+      document.getElementById('formUrl').value = url;
+      document.getElementById('formMode').value = currentMode;
+      document.getElementById('formResolution').value = selectedResolution;
+      document.getElementById('formSavePath').value = document.getElementById('savePath').value.trim();
+
+      const btn = document.getElementById('dlBtn');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+      setStatus('Downloading & merging, this may take a minute...', 'loading');
+
+      // Re-enable after delay
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '↓ Download';
+        setStatus('');
+      }, 90000);
+    }
+
+    function setStatus(msg, type = '') {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = type;
+    }
+
+    // Allow pressing Enter in URL field to trigger fetch
+    document.getElementById('urlInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); fetchInfo(); }
+    });
+  </script>
+</body>
+</html>
